@@ -45,7 +45,6 @@ int main()
 
         cv::imshow("window title", canvas);
 
-        // waitKey(ms) â pauses for ms, returns key pressed (-1 if none)
         // 'q' to quit
         if (cv::waitKey(30) == 'q') { break; }
     }
