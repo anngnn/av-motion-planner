@@ -18,7 +18,15 @@ target_include_directories(planning_lib  PUBLIC include/)
 target_compile_options(planning_lib PUBLIC -Wall -Wextra -Wpedantic)
 target_compile_features(planning_lib PUBLIC cxx_std_23)
 
-
 add_executable(av_motion_planner_exe src/main.cpp)
 
 target_link_libraries(av_motion_planner_exe kinematic_model_lib planning_lib ${OpenCV_LIBS})
+
+include(CTest)
+
+if(BUILD_TESTING)
+  find_package(Catch2 3 REQUIRED)
+  add_executable(test_planning_exe tests/test_road_graph.cpp)
+  target_link_libraries(test_planning_exe Catch2::Catch2WithMain planning_lib)
+  add_test(NAME test_planning COMMAND test_planning_exe)
+endif()
