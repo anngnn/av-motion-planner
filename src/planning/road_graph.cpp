@@ -4,6 +4,7 @@
 void RoadGraph::add_node(int id, const Point & pos)
 {
     nodes_[id] = Node{id, pos};
+    adj_[id] = {};  //  initialize an empty entry in adj_
 }
 
 void RoadGraph::add_edge(int from, int to)
