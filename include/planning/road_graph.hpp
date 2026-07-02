@@ -21,10 +21,10 @@ struct Edge
 class RoadGraph
 {
     public:
-        void add_node(int id, Point pos);
-        void add_edge(int from, int to);    // bidirectional, cost = Euclidean distance between their positions
+        void add_node(int id, const Point &  pos);
+        void add_edge(int from, int to);    // bidirectional
         const Node & node(int id) const { return nodes_.at(id); }
-        const std::vector<Edge> & neighbors(int id) const;
+        const std::vector<Edge> & neighbors(int id) const { return adj_.at(id); }
 
     private:
         std::unordered_map<int, Node> nodes_;
