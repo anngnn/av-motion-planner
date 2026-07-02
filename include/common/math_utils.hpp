@@ -1,7 +1,8 @@
 #ifndef MATH_UTILS_HPP_
 #define MATH_UTILS_HPP_
+// Shared math helpers used across planning modules.
 #include <cmath>
-#include "common/types.hpp" 
+#include "common/types.hpp"
 
 // Straight-line distance between two world-frame points
 inline double eucl_dist(const Point& p1, const Point& p2)

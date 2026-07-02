@@ -1,5 +1,7 @@
 #ifndef A_STAR_HPP_
 #define A_STAR_HPP_
+// A* graph search: finds the shortest Path through a RoadGraph from start to
+// goal node. Returns nullopt if no path exists.
 
 #include <optional>
 #include "common/types.hpp"
