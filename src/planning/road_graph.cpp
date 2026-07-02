@@ -1,17 +1,5 @@
 // Implementation of RoadGraph: node/edge insertion and adjacency queries.
 #include "planning/road_graph.hpp"
-#include <cmath>
-
-namespace
-{
-    // Straight-line distance between two world-frame points
-    double eucl_dist(const Point& p1, const Point& p2)
-    {
-        double dx = p2.x - p1.x;
-        double dy = p2.y - p1.y;
-        return std::hypot(dx, dy);
-    }
-} // namespace
 
 void RoadGraph::add_node(int id, const Point & pos)
 {

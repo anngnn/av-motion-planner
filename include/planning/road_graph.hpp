@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "common/types.hpp"
+#include "common/math_utils.hpp"
 
 // A waypoint or intersection in the road network
 struct Node
