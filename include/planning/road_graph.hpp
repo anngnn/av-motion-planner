@@ -41,6 +41,12 @@ class RoadGraph
         // Return all edges leaving this node (throws if id unknown)
         const std::vector<Edge>& neighbors(int id) const { return adj_.at(id); }
 
+        // Returns the whole map
+        const std::unordered_map<int, Node> & nodes() const { return nodes_; }
+        
+        // Returns adjecency list
+        const std::unordered_map<int, std::vector<Edge>> & adj() const { return adj_; }
+
     private:
         std::unordered_map<int, Node> nodes_;              // id → node
         std::unordered_map<int, std::vector<Edge>> adj_;   // id → outgoing edges
