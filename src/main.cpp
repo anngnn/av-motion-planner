@@ -44,6 +44,18 @@ void draw_road_nodes(const RoadGraph & rg, cv::Mat & canvas)
     }
 }
 
+void draw_astar_path(const Path & path, cv::Mat & canvas)
+{
+    // convert Path (vector<Point>) to vector<cv::Point>
+    std::vector<cv::Point> pix_pts;
+    for (const auto p : path)
+    {
+        pix_pts.push_back(cv::Point(world_to_pix(p.x, true), world_to_pix(p.y, false)));
+    }
+    // draw: isClosed=false, color=green, thickness=2
+    cv::polylines(canvas, pix_pts, false, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+}
+
 int main()
 {
     // start at origin, facing +x (theta = 0)
@@ -91,6 +103,10 @@ int main()
         // cv::line(canvas, p1, p2, cv::Scalar(0, 0, 255), thickness, cv::LINE_AA);
 
         draw_road_nodes(rg, canvas);
+        if (path.has_value())
+        {
+            draw_astar_path(*path, canvas);
+        }
 
         cv::imshow("window title", canvas);
 
