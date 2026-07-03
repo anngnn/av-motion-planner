@@ -23,9 +23,24 @@ void draw_road_nodes(const RoadGraph & rg, cv::Mat & canvas)
 {
     for (const auto & [id, node] : rg.nodes())
     {
-        auto car_pix_x = world_to_pix(node.pos.x, true);
-        auto car_pix_y = world_to_pix(node.pos.y, false);
-        cv::circle(canvas, cv::Point(car_pix_x, car_pix_y), 15, cv::Scalar(0, 0, 0), -1);
+        auto pix_x = world_to_pix(node.pos.x, true);
+        auto pix_y = world_to_pix(node.pos.y, false);
+        cv::circle(canvas, cv::Point(pix_x, pix_y), 15, cv::Scalar(0, 0, 0), 2);
+        cv::putText(
+            canvas, std::to_string(id),
+            cv::Point(pix_x - 8, pix_y + 6),  // nudge to center
+            cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 2
+        );      
+    }
+    // draw edges
+    for (const auto & [id, edges] : rg.adj())
+    {
+        for (const auto & e : edges)
+        {
+            cv::Point p1(world_to_pix(rg.node(id).pos.x, true), world_to_pix(rg.node(id).pos.y, false));
+            cv::Point p2(world_to_pix(rg.node(e.to).pos.x, true), world_to_pix(rg.node(e.to).pos.y, false));
+            cv::line(canvas, p1, p2, cv::Scalar(0, 0, 0), 2, cv::LINE_AA);
+        }
     }
 }
 
