@@ -1,13 +1,16 @@
+#include <iostream>
 #include <opencv2/opencv.hpp>
 
 #include "vehicle/kinematic_model.hpp"
 #include "planning/road_graph.hpp"
 #include "planning/astar.hpp"
+#include "common/math_utils.hpp"
 
 constexpr double kScale = 50.0; // pixels per meter
 constexpr int kWidth = 800;
 constexpr int kHeight = 600;
 constexpr double kHeadingLineLen = 20.0;
+constexpr double kReachThreshold = 0.5;
 
 double world_to_pix(double coord, bool is_x)
 {
@@ -56,11 +59,39 @@ void draw_astar_path(const Path & path, cv::Mat & canvas)
     cv::polylines(canvas, pix_pts, false, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
 }
 
+void draw_car(cv::Mat & canvas, KinematicModel & car)
+{
+    auto car_pix_x = world_to_pix(car.pose().x, true);
+    auto car_pix_y = world_to_pix(car.pose().y, false);
+
+    cv::circle(canvas, cv::Point(car_pix_x, car_pix_y), 8, cv::Scalar(255, 0, 0), -1);
+    
+    cv::Point p1(car_pix_x, car_pix_y);
+    auto end_x = car_pix_x + std::cos(car.pose().theta) * kHeadingLineLen;
+    auto end_y = car_pix_y - std::sin(car.pose().theta) * kHeadingLineLen;
+    cv::Point p2(end_x, end_y);
+
+    int thickness = 2;
+
+    cv::line(canvas, p1, p2, cv::Scalar(0, 0, 255), thickness, cv::LINE_AA);
+}
+
+void go_to_wp(const Path & path, int & wp_id, KinematicModel & car)
+{
+    Point goal_wp = path.at(wp_id);
+    auto desired_heading = std::atan2(goal_wp.y - car.pose().y, goal_wp.x - car.pose().x);
+    auto steering = desired_heading - car.pose().theta;
+
+    car.update(0.5, steering, 0.05);
+    if ( eucl_dist(Point{car.pose().x, car.pose().y}, goal_wp)< kReachThreshold)
+    {
+        wp_id++;
+    }
+
+}
+
 int main()
 {
-    // start at origin, facing +x (theta = 0)
-    KinematicModel car{Pose{0.0, 0.0, 0.0}};
-
     cv::Mat canvas(kHeight, kWidth, CV_8UC3);
     
     Path waypoints{Point{-5.0, 5.0}, Point{5.0, 5.0}, Point{5.0, -5.0}, Point{-5.0, -5.0}};
@@ -79,8 +110,21 @@ int main()
     rg.add_edge(0,3);
     rg.add_edge(2,1);
     rg.add_edge(2,3);
-    // run A*
+    // run A* once, up front — if no route exists there's nothing to simulate
     auto path = a_star(rg, 0, 2);
+    if (!path.has_value())
+    {
+        std::cerr << "A* found no path\n";
+        return 1;
+    }
+
+    int wp_id = 0;
+
+    // spawn the car at the route's first waypoint
+    const Point & start = path->at(0);
+    double init_heading = 0.0;
+    KinematicModel car{Pose{start.x, start.y, init_heading}};
+
 
     while (true)
     {
@@ -103,10 +147,14 @@ int main()
         // cv::line(canvas, p1, p2, cv::Scalar(0, 0, 255), thickness, cv::LINE_AA);
 
         draw_road_nodes(rg, canvas);
-        if (path.has_value())
+        draw_astar_path(*path, canvas);
+
+        if (wp_id < static_cast<int>(path->size()))
         {
-            draw_astar_path(*path, canvas);
+            go_to_wp(*path, wp_id, car);
         }
+
+        draw_car(canvas, car);
 
         cv::imshow("window title", canvas);
 

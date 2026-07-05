@@ -15,6 +15,7 @@ void KinematicModel::update(double acceleration, double steering_angle, double d
     pose_.y     += speed_ * std::sin(pose_.theta) * dt;
     pose_.theta += arc_length / R;   // heading rotates from where it currently points
 
-    speed_    += acceleration * dt;  // speed integrates acceleration over time
+    speed_    += acceleration * dt;               // speed integrates acceleration over time
+    speed_     = std::clamp(speed_, 0.0, kMaxSpeed);  // cap: no reverse, no runaway top speed
     steering_  = delta;              // store clamped angle (used for visualization)
 }
