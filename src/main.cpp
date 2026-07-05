@@ -22,6 +22,8 @@ double world_to_pix(double coord, bool is_x)
     return -coord * kScale + kHeight / 2;    // origin at top-left, y increases downward
 }
 
+// Draw every graph node as a labelled black circle, plus a line for each edge,
+// so the road network is visible. Positions are converted world->pixels.
 void draw_road_nodes(const RoadGraph & rg, cv::Mat & canvas)
 {
     for (const auto & [id, node] : rg.nodes())
@@ -47,6 +49,7 @@ void draw_road_nodes(const RoadGraph & rg, cv::Mat & canvas)
     }
 }
 
+// Draw the planned A* route as a green polyline connecting its waypoints in order.
 void draw_astar_path(const Path & path, cv::Mat & canvas)
 {
     // convert Path (vector<Point>) to vector<cv::Point>
@@ -59,6 +62,7 @@ void draw_astar_path(const Path & path, cv::Mat & canvas)
     cv::polylines(canvas, pix_pts, false, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
 }
 
+// Draw the car as a filled blue circle with a red line showing its heading.
 void draw_car(cv::Mat & canvas, KinematicModel & car)
 {
     auto car_pix_x = world_to_pix(car.pose().x, true);
@@ -76,13 +80,19 @@ void draw_car(cv::Mat & canvas, KinematicModel & car)
     cv::line(canvas, p1, p2, cv::Scalar(0, 0, 255), thickness, cv::LINE_AA);
 }
 
-void go_to_wp(const Path & path, int & wp_id, KinematicModel & car)
+// Advance the car one timestep toward the current waypoint (path[wp_id]):
+// steer toward it, then if we're within kReachThreshold, retarget the next one.
+// wp_id is taken by reference so the advance persists across frames.
+void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 {
     Point goal_wp = path.at(wp_id);
+    // point the wheels at the target: desired heading minus current heading,
+    // wrapped to [-pi, pi] so the car always turns the short way
     auto desired_heading = std::atan2(goal_wp.y - car.pose().y, goal_wp.x - car.pose().x);
-    auto steering = desired_heading - car.pose().theta;
+    auto steering = normalize_angle(desired_heading - car.pose().theta);
 
-    car.update(0.5, steering, 0.05);
+    car.update(0.5, steering, 0.05);  // constant gentle acceleration, computed steering
+    // close enough to this waypoint -> start heading for the next one
     if ( eucl_dist(Point{car.pose().x, car.pose().y}, goal_wp)< kReachThreshold)
     {
         wp_id++;
@@ -120,38 +130,29 @@ int main()
 
     int wp_id = 0;
 
-    // spawn the car at the route's first waypoint
+    // Spawn the car at the route's first waypoint, already facing the second one,
+    // so it only needs small steering corrections instead of a hard U-turn on frame 1.
     const Point & start = path->at(0);
-    double init_heading = 0.0;
+    double init_heading = 0.0;  // default: face +x (used when the route is a single point)
+    if (path->size() >= 2)
+    {
+        // heading = angle of the vector from the first waypoint to the second.
+        // atan2(dy, dx) handles all four quadrants (unlike atan(dy/dx)).
+        init_heading = std::atan2(path->at(1).y - start.y, path->at(1).x - start.x);
+    }
     KinematicModel car{Pose{start.x, start.y, init_heading}};
-
 
     while (true)
     {
         // canvas: height x width, 3-channel BGR, white background
         canvas.setTo(cv::Scalar(255, 255, 255));  // clear to white each frame
 
-        // car.update(0.5, 0.1, 0.05);
-        // auto car_pix_x = world_to_pix(car.pose().x, true);
-        // auto car_pix_y = world_to_pix(car.pose().y, false);
-
-        // cv::circle(canvas, cv::Point(car_pix_x, car_pix_y), 8, cv::Scalar(255, 0, 0), -1);
-        
-        // cv::Point p1(car_pix_x, car_pix_y);
-        // auto end_x = car_pix_x + std::cos(car.pose().theta) * kHeadingLineLen;
-        // auto end_y = car_pix_y - std::sin(car.pose().theta) * kHeadingLineLen;
-        // cv::Point p2(end_x, end_y);
-
-        // int thickness = 2;
-
-        // cv::line(canvas, p1, p2, cv::Scalar(0, 0, 255), thickness, cv::LINE_AA);
-
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
 
         if (wp_id < static_cast<int>(path->size()))
         {
-            go_to_wp(*path, wp_id, car);
+            step_toward_waypoint(*path, wp_id, car);
         }
 
         draw_car(canvas, car);
