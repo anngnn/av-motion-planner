@@ -7,7 +7,7 @@
 // Physical constants for a typical sedan (e.g. Toyota Camry)
 // constexpr = known at compile time, zero runtime cost
 constexpr double kWheelbase   = 2.7;  // distance between front and rear axles, meters
-constexpr double kMaxSteering = 0.6;  // maximum steering angle, radians (~34 degrees)
+constexpr double kMaxSteering = 0.9;  // maximum steering angle, radians (~51 degrees)
 constexpr double kMaxSpeed    = 3.0;  // speed cap, m/s — keeps the car controllable on-screen
 
 class KinematicModel

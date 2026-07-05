@@ -6,11 +6,11 @@
 #include "planning/astar.hpp"
 #include "common/math_utils.hpp"
 
-constexpr double kScale = 50.0; // pixels per meter
-constexpr int kWidth = 800;
-constexpr int kHeight = 600;
+constexpr double kScale = 30.0; // pixels per meter
+constexpr int kWidth = 1000;
+constexpr int kHeight = 1000;
 constexpr double kHeadingLineLen = 20.0;
-constexpr double kReachThreshold = 0.5;
+constexpr double kReachThreshold = 1.5;
 
 double world_to_pix(double coord, bool is_x)
 {
@@ -104,32 +104,38 @@ int main()
 {
     cv::Mat canvas(kHeight, kWidth, CV_8UC3);
 
-    // build a road network
+    // Build a 3x3 grid road network. Node id = row*3 + col, so ids run 0-8
+    // bottom-left to top-right. Two passes: add all nodes first, then edges
+    // (add_edge looks up both endpoints, so every node must exist before any edge).
     RoadGraph rg;
 
-    int spacing = 3;
+    int spacing = 6;  // meters between adjacent grid nodes
+    // Pass 1: place the 9 nodes. Subtracting `spacing` re-centers the grid on the
+    // origin (columns land at -spacing, 0, +spacing) so it draws in the screen center.
     for (int row = 0; row < 3; ++row)
     {
         for (int col = 0; col < 3; ++col)
         {
             int id = row * 3 + col;
-            double x = col * spacing - 3;
-            double y = row * spacing - 3;
+            double x = col * spacing - spacing;
+            double y = row * spacing - spacing;
             rg.add_node(id, Point{x, y});
         }
     }
 
+    // Pass 2: connect each node to its right and top neighbor only. add_edge is
+    // bidirectional, so this covers every grid connection exactly once.
     for (int row = 0; row < 3; ++row)
     {
         for (int col = 0; col < 3; ++col)
         {
             int id = row * 3 + col;
-            // right neighbor
+            // right neighbor: same row, next column
             if (col < 2)
             {
                 rg.add_edge(id, row * 3 + (col + 1));
             }
-            // top neighbor
+            // top neighbor: next row, same column
             if (row < 2)
             {
                 rg.add_edge(id, (row + 1) * 3 + col);
