@@ -26,4 +26,6 @@ struct FrenetPoint
 // The reference line: an ordered sequence of RefPoints with strictly increasing s.
 using RefLine = std::vector<RefPoint>;
 
+RefLine path_to_refline(const Path & path);
+
 #endif // FRENET_HPP_
