@@ -103,25 +103,42 @@ void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 int main()
 {
     cv::Mat canvas(kHeight, kWidth, CV_8UC3);
-    
-    Path waypoints{Point{-5.0, 5.0}, Point{5.0, 5.0}, Point{5.0, -5.0}, Point{-5.0, -5.0}};
 
     // build a road network
     RoadGraph rg;
-    int id = 0;
-    for (const auto& p : waypoints)
+
+    int spacing = 3;
+    for (int row = 0; row < 3; ++row)
     {
-        rg.add_node(id, p);
-        ++id;
+        for (int col = 0; col < 3; ++col)
+        {
+            int id = row * 3 + col;
+            double x = col * spacing - 3;
+            double y = row * spacing - 3;
+            rg.add_node(id, Point{x, y});
+        }
     }
 
-    rg.add_edge(0,1);
-    rg.add_edge(0,2);
-    rg.add_edge(0,3);
-    rg.add_edge(2,1);
-    rg.add_edge(2,3);
+    for (int row = 0; row < 3; ++row)
+    {
+        for (int col = 0; col < 3; ++col)
+        {
+            int id = row * 3 + col;
+            // right neighbor
+            if (col < 2)
+            {
+                rg.add_edge(id, row * 3 + (col + 1));
+            }
+            // top neighbor
+            if (row < 2)
+            {
+                rg.add_edge(id, (row + 1) * 3 + col);
+            }
+        }
+    }
+
     // run A* once, up front — if no route exists there's nothing to simulate
-    auto path = a_star(rg, 0, 2);
+    auto path = a_star(rg, 0, 8);
     if (!path.has_value())
     {
         std::cerr << "A* found no path\n";
