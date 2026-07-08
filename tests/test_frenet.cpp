@@ -3,12 +3,12 @@
 #include "planning/frenet.hpp"
 #include "common/math_utils.hpp"  // kPi
 
-TEST_CASE("path_to_refline on a straight line", "[frenet]")
+TEST_CASE("path_to_ref_line on a straight line", "[frenet] [path_to_ref_line]")
 {
     SECTION("3 points along +x axis: s accumulates, heading stays 0")
     {
         Path p{ Point{0, 0}, Point{2, 0}, Point{4, 0} };
-        RefLine rline = path_to_refline(p);
+        RefLine rline = path_to_ref_line(p);
 
         REQUIRE(rline.size() == 3);
 
@@ -29,13 +29,13 @@ TEST_CASE("path_to_refline on a straight line", "[frenet]")
     }
 }
 
-TEST_CASE("path_to_refline heading follows the path direction", "[frenet]")
+TEST_CASE("path_to_ref_line heading follows the path direction", "[frenet] [path_to_ref_line]")
 {
     SECTION("right turn then up: heading goes from 0 to pi/2")
     {
         // 0->1 travels +x (heading 0), 1->2 travels +y (heading pi/2)
         Path p{ Point{0, 0}, Point{3, 0}, Point{3, 4} };
-        RefLine rline = path_to_refline(p);
+        RefLine rline = path_to_ref_line(p);
 
         REQUIRE(rline.size() == 3);
 
@@ -51,28 +51,56 @@ TEST_CASE("path_to_refline heading follows the path direction", "[frenet]")
     }
 }
 
-TEST_CASE("path_to_refline handles degenerate paths", "[frenet]")
+TEST_CASE("path_to_ref_line handles degenerate paths", "[frenet] [path_to_ref_line]")
 {
     SECTION("empty path returns empty refline")
     {
         Path p{};
-        REQUIRE(path_to_refline(p).empty());
+        REQUIRE(path_to_ref_line(p).empty());
     }
 
     SECTION("single point returns empty refline")
     {
         Path p{ Point{1, 1} };
-        REQUIRE(path_to_refline(p).empty());
+        REQUIRE(path_to_ref_line(p).empty());
     }
 
     SECTION("diagonal segment gives 45-degree heading and correct s")
     {
         // 3-4-5 triangle: distance is 5, heading atan2(4,3)
         Path p{ Point{0, 0}, Point{3, 4} };
-        RefLine rline = path_to_refline(p);
+        RefLine rline = path_to_ref_line(p);
 
         REQUIRE(rline.size() == 2);
         REQUIRE(rline.at(1).s == Catch::Approx(5));
         REQUIRE(rline.at(0).world_pos.theta == Catch::Approx(std::atan2(4, 3)));
+    }
+}
+
+
+TEST_CASE("to_frenet", "[frenet] [to_frenet]")
+{
+    Path p{ Point{0, 0}, Point{10, 0} };
+    RefLine rline = path_to_ref_line(p);
+
+    SECTION("on the line")
+    {
+        FrenetPoint fpoint = to_frenet(Point {4, 0}, rline);
+        REQUIRE(fpoint.s == Catch::Approx(4));
+        REQUIRE(fpoint.d == Catch::Approx(0));
+    }
+    SECTION("left of the line")
+    {
+        // +y is left of a road heading +x, so d is positive
+        FrenetPoint fpoint = to_frenet(Point {4, 2}, rline);
+        REQUIRE(fpoint.s == Catch::Approx(4));
+        REQUIRE(fpoint.d == Catch::Approx(2));
+    }
+    SECTION("right of the line")
+    {
+        // -y is right of the road, so d is negative
+        FrenetPoint fpoint = to_frenet(Point {4, -3}, rline);
+        REQUIRE(fpoint.s == Catch::Approx(4));
+        REQUIRE(fpoint.d == Catch::Approx(-3));
     }
 }
