@@ -104,3 +104,44 @@ TEST_CASE("to_frenet", "[frenet] [to_frenet]")
         REQUIRE(fpoint.d == Catch::Approx(-3));
     }
 }
+
+TEST_CASE("from_frenet", "[frenet] [from_frenet]")
+{
+    // reference line along +x: s == x, heading 0, so +d is +y (left)
+    Path p{ Point{0, 0}, Point{10, 0} };
+    RefLine rline = path_to_ref_line(p);
+
+    SECTION("on the line: d=0 maps back to the reference point")
+    {
+        Point w = from_frenet(FrenetPoint{4, 0}, rline);
+        REQUIRE(w.x == Catch::Approx(4));
+        REQUIRE(w.y == Catch::Approx(0).margin(1e-9));
+    }
+    SECTION("left offset: +d lands at +y")
+    {
+        Point w = from_frenet(FrenetPoint{4, 2}, rline);
+        REQUIRE(w.x == Catch::Approx(4));
+        REQUIRE(w.y == Catch::Approx(2));
+    }
+    SECTION("right offset: -d lands at -y")
+    {
+        Point w = from_frenet(FrenetPoint{4, -3}, rline);
+        REQUIRE(w.x == Catch::Approx(4));
+        REQUIRE(w.y == Catch::Approx(-3));
+    }
+}
+
+TEST_CASE("to_frenet and from_frenet round-trip", "[frenet] [from_frenet]")
+{
+    Path p{ Point{0, 0}, Point{10, 0} };
+    RefLine rline = path_to_ref_line(p);
+
+    SECTION("world -> frenet -> world returns the original point")
+    {
+        Point original{6, 1.5};
+        FrenetPoint f = to_frenet(original, rline);
+        Point back = from_frenet(f, rline);
+        REQUIRE(back.x == Catch::Approx(original.x));
+        REQUIRE(back.y == Catch::Approx(original.y));
+    }
+}

@@ -28,5 +28,6 @@ using RefLine = std::vector<RefPoint>;
 
 RefLine path_to_ref_line(const Path & path);
 FrenetPoint to_frenet(const Point & world_p, const RefLine & rline);
+Point from_frenet(const FrenetPoint & fp, const RefLine & rline);
 
 #endif // FRENET_HPP_

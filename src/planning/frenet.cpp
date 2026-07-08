@@ -27,15 +27,15 @@ FrenetPoint to_frenet(const Point & world_p, const RefLine & rline)
 {
     // Step 1: min-scan for the reference point closest to world_p
     auto closest_rpoint = rline.at(0);
-    auto shortest_d_to_rpoint = eucl_dist(world_p, Point{closest_rpoint.world_pos.x, closest_rpoint.world_pos.y});
+    auto min_dis_to_rpoint = eucl_dist(world_p, Point{closest_rpoint.world_pos.x, closest_rpoint.world_pos.y});
 
     for (const auto & rpoint : rline)
     {
         auto dis = eucl_dist(world_p, Point{rpoint.world_pos.x, rpoint.world_pos.y});
-        if (dis < shortest_d_to_rpoint)
+        if (dis < min_dis_to_rpoint)
         {
             closest_rpoint = rpoint;
-            shortest_d_to_rpoint = dis;
+            min_dis_to_rpoint = dis;
         }
     }
 
@@ -56,4 +56,33 @@ FrenetPoint to_frenet(const Point & world_p, const RefLine & rline)
     auto s = closest_rpoint.s + along_track_distance;
 
     return FrenetPoint{s, d};
+}
+
+// Convert a Frenet (s, d) coordinate back into a world-frame point, the inverse of
+// to_frenet. Two steps: 
+// (1) find the reference point nearest the target arc length s,
+// (2) step d meters perpendicular to that point's heading.
+Point from_frenet(const FrenetPoint & fp, const RefLine & rline)
+{
+    auto s = fp.s;
+    auto d = fp.d;
+
+    // Step 1: find the ref point whose arc length is closest to the target s
+    auto closest_rpoint = rline.at(0);
+    auto min_s_diff = std::abs(closest_rpoint.s - s);
+    for (const auto & rpoint : rline)
+    {
+        auto s_diff = std::abs(rpoint.s - s);
+        if (s_diff < min_s_diff)
+        {
+            closest_rpoint = rpoint;
+            min_s_diff = s_diff;
+        }
+    }
+
+    // Step 2: offset d along the perpendicular (heading + 90 deg, so +d is left)
+    auto theta = closest_rpoint.world_pos.theta;
+    auto x = closest_rpoint.world_pos.x + d * std::cos(theta + kPi / 2);
+    auto y = closest_rpoint.world_pos.y + d * std::sin(theta + kPi / 2);
+    return Point{x, y};
 }
