@@ -59,30 +59,36 @@ FrenetPoint to_frenet(const Point & world_p, const RefLine & rline)
 }
 
 // Convert a Frenet (s, d) coordinate back into a world-frame point, the inverse of
-// to_frenet. Two steps: 
-// (1) find the reference point nearest the target arc length s,
-// (2) step d meters perpendicular to that point's heading.
+// to_frenet. Three steps:
+// (1) find the two ref points that bracket the target arc length s,
+// (2) linearly interpolate base position and heading between them,
+// (3) step d meters perpendicular to that heading.
 Point from_frenet(const FrenetPoint & fp, const RefLine & rline)
 {
     auto s = fp.s;
     auto d = fp.d;
 
-    // Step 1: find the ref point whose arc length is closest to the target s
-    auto closest_rpoint = rline.at(0);
-    auto min_s_diff = std::abs(closest_rpoint.s - s);
-    for (const auto & rpoint : rline)
+    // Step 1: find the bracketing pair where lower.s <= s <= upper.s
+    auto rpoint_lower = rline.at(0);
+    auto rpoint_upper = rline.at(0);
+    for (int i = 0; i < static_cast<int>(rline.size()) - 1; ++i)
     {
-        auto s_diff = std::abs(rpoint.s - s);
-        if (s_diff < min_s_diff)
+        if (rline.at(i + 1).s >= s)
         {
-            closest_rpoint = rpoint;
-            min_s_diff = s_diff;
+            rpoint_lower = rline.at(i);
+            rpoint_upper = rline.at(i + 1);
+            break;
         }
     }
 
-    // Step 2: offset d along the perpendicular (heading + 90 deg, so +d is left)
-    auto theta = closest_rpoint.world_pos.theta;
-    auto x = closest_rpoint.world_pos.x + d * std::cos(theta + kPi / 2);
-    auto y = closest_rpoint.world_pos.y + d * std::sin(theta + kPi / 2);
+    auto ratio = (s - rpoint_lower.s) / (rpoint_upper.s - rpoint_lower.s);
+
+    auto base_x = rpoint_lower.world_pos.x     + ratio*(rpoint_upper.world_pos.x - rpoint_lower.world_pos.x);
+    auto base_y = rpoint_lower.world_pos.y     + ratio*(rpoint_upper.world_pos.y - rpoint_lower.world_pos.y);
+    auto theta  = rpoint_lower.world_pos.theta + ratio*(rpoint_upper.world_pos.theta - rpoint_lower.world_pos.theta);
+   
+    auto x = base_x + d * std::cos(theta + kPi / 2);
+    auto y = base_y + d * std::sin(theta + kPi / 2);
+
     return Point{x, y};
 }
