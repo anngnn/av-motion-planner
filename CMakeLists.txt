@@ -41,8 +41,8 @@ target_compile_options(kinematic_model_lib PUBLIC -Wall -Wextra -Wpedantic)
 # whereas PRIVATE would make it apply only to the library itself
 target_compile_features(kinematic_model_lib PUBLIC cxx_std_23)
 
-add_library(planning_lib src/planning/road_graph.cpp src/planning/astar.cpp src/planning/frenet.cpp)
-target_include_directories(planning_lib  PUBLIC include/)
+add_library(planning_lib src/planning/road_graph.cpp src/planning/astar.cpp src/planning/frenet.cpp src/planning/quintic_polynomial.cpp)
+target_include_directories(planning_lib PUBLIC include/ /usr/include/eigen3)
 target_compile_options(planning_lib PUBLIC -Wall -Wextra -Wpedantic)
 target_compile_features(planning_lib PUBLIC cxx_std_23)
 
@@ -63,7 +63,7 @@ include(CTest)
 
 if(BUILD_TESTING)
   find_package(Catch2 3 REQUIRED)
-  add_executable(test_planning_exe tests/test_road_graph.cpp tests/test_astar.cpp tests/test_frenet.cpp)
+  add_executable(test_planning_exe tests/test_road_graph.cpp tests/test_astar.cpp tests/test_frenet.cpp tests/test_quintic.cpp)
   target_link_libraries(test_planning_exe Catch2::Catch2WithMain planning_lib)
   add_test(NAME test_planning COMMAND test_planning_exe)
 endif()
