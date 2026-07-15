@@ -4,6 +4,10 @@
 #include <vector>
 #include "common/types.hpp"
 
+// ---------------------------------------------------------------------------
+// Reference line: the smooth centerline the Frenet frame is defined against.
+// ---------------------------------------------------------------------------
+
 // A fixed anchor point that defines the reference line itself, stored in world
 // coordinates. These are the "mile markers": each has a real (x, y), the path's
 // heading there, and its arc length s. The RefLine (vector of these) is built once
@@ -14,6 +18,17 @@ struct RefPoint
     double s;       // cumulative arc length from the first point (s = 0 at the start)
 };
 
+// The reference line: an ordered sequence of RefPoints with strictly increasing s.
+using RefLine = std::vector<RefPoint>;
+
+// Build a reference line from an A* path: fills in each point's heading (path
+// tangent) and cumulative arc length s. Returns empty if the path has < 2 points.
+RefLine path_to_ref_line(const Path & path);
+
+// ---------------------------------------------------------------------------
+// Frenet coordinates and the world <-> Frenet transforms.
+// ---------------------------------------------------------------------------
+
 // A position expressed in the road-relative Frenet frame, not world coordinates.
 // Its meaning depends entirely on the reference line: s = how far along, d = how far
 // to the side. Used for the car, obstacles, and candidate trajectory points.
@@ -23,13 +38,6 @@ struct FrenetPoint
     double d;  // lateral offset FROM the line (signed: + one side, - the other)
 };
 
-// The reference line: an ordered sequence of RefPoints with strictly increasing s.
-using RefLine = std::vector<RefPoint>;
-
-// Build a reference line from an A* path: fills in each point's heading (path
-// tangent) and cumulative arc length s. Returns empty if the path has < 2 points.
-RefLine path_to_ref_line(const Path & path);
-
 // World (x, y) -> Frenet (s, d): projects the point onto the reference line.
 // s = arc length of the nearest point plus how far along past it, d = signed offset.
 FrenetPoint to_frenet(const Point & world_p, const RefLine & rline);
@@ -37,6 +45,19 @@ FrenetPoint to_frenet(const Point & world_p, const RefLine & rline);
 // Frenet (s, d) -> world (x, y): the inverse. Interpolates a base point at arc
 // length s along the line, then steps d perpendicular to the line's heading.
 Point from_frenet(const FrenetPoint & fp, const RefLine & rline);
+
+// ---------------------------------------------------------------------------
+// Candidate trajectory generation.
+// ---------------------------------------------------------------------------
+
+// The car's full motion state in the Frenet frame: position, velocity, and
+// acceleration on both axes. Serves as the start boundary conditions for the
+// polynomials when generating candidate trajectories.
+struct FrenetState
+{
+    double s, s_dot, s_ddot;  // longitudinal: position, velocity, acceleration
+    double d, d_dot, d_ddot;  // lateral:      position, velocity, acceleration
+};
 
 // One candidate trajectory the car could follow over the next few seconds.
 // Struct-of-arrays: every vector has the same length, and index i is one time step.
@@ -84,5 +105,10 @@ struct FrenetConfig
 
     double dt = 0.1;  // time step when sampling points along each trajectory
 };
+
+// Generate all candidate trajectories by sweeping lateral offset d, horizon T, and
+// target speed. Each candidate starts from `start` and is sampled every config.dt.
+std::vector<FrenetTrajectory> generate_frenet_trajectories(
+    const FrenetState & start, const RefLine & rline, const FrenetConfig & config);
 
 #endif // FRENET_HPP_
