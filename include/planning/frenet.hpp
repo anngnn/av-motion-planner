@@ -64,4 +64,25 @@ struct FrenetTrajectory
     double cost = 0.0;            // filled in when the trajectory is scored
 };
 
+// Tuning knobs for the Frenet candidate sampler. All SI units (meters, seconds, m/s).
+// The generator sweeps three axes: lateral offset d, maneuver horizon T, target speed.
+struct FrenetConfig
+{
+    // lateral offset sweep: sample d in [-max_road_width, +max_road_width]
+    double max_road_width = 3.0;   // how far to each side of the reference line
+    int    num_d_samples  = 7;     // how many lateral offsets to try
+
+    // time-horizon sweep: sample T in [min_t, max_t]
+    double min_t          = 2.0;   // shortest maneuver duration
+    double max_t          = 5.0;   // longest maneuver duration
+    int    num_t_samples  = 4;     // how many horizons to try
+
+    // speed sweep: sample target_speed +/- speed_range, centered on the goal speed
+    double target_speed      = 5.0;  // desired cruising speed
+    double speed_range       = 1.0;  // half-width of the speed sweep
+    int    num_speed_samples = 3;    // how many speeds to try
+
+    double dt = 0.1;  // time step when sampling points along each trajectory
+};
+
 #endif // FRENET_HPP_
