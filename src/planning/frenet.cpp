@@ -95,30 +95,41 @@ Point from_frenet(const FrenetPoint & fp, const RefLine & rline)
     return Point{x, y};
 }
 
+// Generate all candidate trajectories by sweeping three axes: lateral end offset
+// d_end, maneuver horizon T, and target speed. Each combination becomes one smooth
+// trajectory: a quintic draws the lateral motion, a quartic the longitudinal, both
+// sampled every config.dt and converted to world points. Returns the full menu of
+// candidates for a later cost/collision stage to score.
 std::vector<FrenetTrajectory> generate_frenet_trajectories(
     const FrenetState & start, const RefLine & rline, const FrenetConfig & config)
-{   
+{
     std::vector<FrenetTrajectory> trajs;
+
+    // step sizes turn a sample COUNT into evenly spaced values (fence-post: count-1 gaps)
     double d_step = (2 * config.max_road_width) / (config.num_d_samples - 1);
     for (int i = 0; i < config.num_d_samples; ++i)
     {
-        double d_end = -config.max_road_width + i * d_step;
+        double d_end = -config.max_road_width + i * d_step;  // lateral goal, -width..+width
         double t_step = (config.max_t - config.min_t) / (config.num_t_samples - 1);
         for (int j = 0; j < config.num_t_samples; ++j)
         {
-            double T = config.min_t + j * t_step;
+            double T = config.min_t + j * t_step;  // maneuver duration, min_t..max_t
             double speed_step = (2 * config.speed_range) / (config.num_speed_samples - 1);
             for (int k = 0; k < config.num_speed_samples; ++k)
             {
                 double speed = (config.target_speed - config.speed_range) + k * speed_step;
+
+                // lateral: from current d-state to d_end, settled (0 vel/accel), over T
                 QuinticPolynomial lat(start.d, start.d_dot, start.d_ddot,
                                     d_end, 0.0, 0.0,
                                     T);
+                // longitudinal: from current s-state to target speed (end position free), over T
                 QuarticPolynomial lon(start.s, start.s_dot, start.s_ddot,
                                     speed, 0.0,
                                     T);
                 FrenetTrajectory traj;
 
+                // sample both curves at each time step to trace out the trajectory
                 for (double t = 0.0; t <= T; t += config.dt)
                 {
                     double s = lon.calc_pos(t);
@@ -137,11 +148,12 @@ std::vector<FrenetTrajectory> generate_frenet_trajectories(
                     traj.d_ddot.push_back(lat.calc_acc(t));
                     traj.d_dddot.push_back(lat.calc_jerk(t));
 
+                    // convert this (s, d) sample back to a world point for drawing/collision
                     Point point_world = from_frenet(FrenetPoint{s, d}, rline);
                     traj.x_world.push_back(point_world.x);
                     traj.y_world.push_back(point_world.y);
                 }
-                trajs.push_back(traj);
+                trajs.push_back(traj);  // one finished candidate
             }
         }
     }
