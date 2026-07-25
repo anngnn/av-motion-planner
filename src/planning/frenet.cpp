@@ -1,5 +1,7 @@
-#include "planning/frenet.hpp"
 #include "common/math_utils.hpp"
+#include "planning/frenet.hpp"
+#include "planning/quintic_polynomial.hpp"
+#include "planning/quartic_polynomial.hpp"
 
 RefLine path_to_ref_line(const Path & path)
 {
@@ -91,4 +93,57 @@ Point from_frenet(const FrenetPoint & fp, const RefLine & rline)
     auto y = base_y + d * std::sin(theta + kPi / 2);
 
     return Point{x, y};
+}
+
+std::vector<FrenetTrajectory> generate_frenet_trajectories(
+    const FrenetState & start, const RefLine & rline, const FrenetConfig & config)
+{   
+    std::vector<FrenetTrajectory> trajs;
+    double d_step = (2 * config.max_road_width) / (config.num_d_samples - 1);
+    for (int i = 0; i < config.num_d_samples; ++i)
+    {
+        double d_end = -config.max_road_width + i * d_step;
+        double t_step = (config.max_t - config.min_t) / (config.num_t_samples - 1);
+        for (int j = 0; j < config.num_t_samples; ++j)
+        {
+            double T = config.min_t + j * t_step;
+            double speed_step = (2 * config.speed_range) / (config.num_speed_samples - 1);
+            for (int k = 0; k < config.num_speed_samples; ++k)
+            {
+                double speed = (config.target_speed - config.speed_range) + k * speed_step;
+                QuinticPolynomial lat(start.d, start.d_dot, start.d_ddot,
+                                    d_end, 0.0, 0.0,
+                                    T);
+                QuarticPolynomial lon(start.s, start.s_dot, start.s_ddot,
+                                    speed, 0.0,
+                                    T);
+                FrenetTrajectory traj;
+
+                for (double t = 0.0; t <= T; t += config.dt)
+                {
+                    double s = lon.calc_pos(t);
+                    double d = lat.calc_pos(t);
+                    traj.t.push_back(t);
+
+                    // sample the longitudinal (forward) curve and its derivatives
+                    traj.s.push_back(s);
+                    traj.s_dot.push_back(lon.calc_vel(t));
+                    traj.s_ddot.push_back(lon.calc_acc(t));
+                    traj.s_dddot.push_back(lon.calc_jerk(t));
+
+                    // sample the lateral (sideways) curve and its derivatives
+                    traj.d.push_back(d);
+                    traj.d_dot.push_back(lat.calc_vel(t));
+                    traj.d_ddot.push_back(lat.calc_acc(t));
+                    traj.d_dddot.push_back(lat.calc_jerk(t));
+
+                    Point point_world = from_frenet(FrenetPoint{s, d}, rline);
+                    traj.x_world.push_back(point_world.x);
+                    traj.y_world.push_back(point_world.y);
+                }
+                trajs.push_back(traj);
+            }
+        }
+    }
+    return trajs;
 }
