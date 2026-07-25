@@ -1,10 +1,11 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
+#include "common/math_utils.hpp"
 #include "vehicle/kinematic_model.hpp"
 #include "planning/road_graph.hpp"
 #include "planning/astar.hpp"
-#include "common/math_utils.hpp"
+#include "planning/frenet.hpp"
 
 constexpr double kScale = 30.0; // pixels per meter
 constexpr int kWidth = 1000;
@@ -100,6 +101,21 @@ void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 
 }
 
+void draw_trajectories(const std::vector<FrenetTrajectory> & trajs, cv::Mat & canvas)
+{
+    for (const auto & traj : trajs)
+    {
+        std::vector<cv::Point> pix_pts;
+        for (size_t i = 0; i < traj.x_world.size(); ++i)
+        {
+            double pix_x = world_to_pix(traj.x_world[i], true);
+            double pix_y = world_to_pix(traj.y_world[i], false);
+            pix_pts.push_back(cv::Point(pix_x, pix_y));
+        }
+        cv::polylines(canvas, pix_pts, false, cv::Scalar(200, 200, 200), 2, cv::LINE_AA);
+    }
+}
+
 int main()
 {
     cv::Mat canvas(kHeight, kWidth, CV_8UC3);
@@ -165,11 +181,18 @@ int main()
     }
     KinematicModel car{Pose{start.x, start.y, init_heading}};
 
+    RefLine rline = path_to_ref_line(*path);
+    FrenetConfig frenetconfig;
+    FrenetPoint start_f_point = to_frenet(start, rline);
+    auto start_frenetstate = FrenetState{start_f_point.s, 0.0, 0.0, start_f_point.d, 0.0, 0.0};
+    auto trajs = generate_frenet_trajectories(start_frenetstate, rline, frenetconfig);
+
     while (true)
     {
         // canvas: height x width, 3-channel BGR, white background
         canvas.setTo(cv::Scalar(255, 255, 255));  // clear to white each frame
-
+        
+        draw_trajectories(trajs, canvas);
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
 
