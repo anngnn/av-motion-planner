@@ -116,6 +116,18 @@ void draw_trajectories(const std::vector<FrenetTrajectory> & trajs, cv::Mat & ca
     }
 }
 
+void draw_best_traj(const FrenetTrajectory & traj, cv::Mat & canvas)
+{
+    std::vector<cv::Point> pix_pts;
+    for (size_t i = 0; i < traj.x_world.size(); ++i)
+    {
+        double pix_x = world_to_pix(traj.x_world[i], true);
+        double pix_y = world_to_pix(traj.y_world[i], false);
+        pix_pts.push_back(cv::Point(pix_x, pix_y));
+    }
+    cv::polylines(canvas, pix_pts, false, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+}
+
 int main()
 {
     cv::Mat canvas(kHeight, kWidth, CV_8UC3);
@@ -183,7 +195,8 @@ int main()
 
     RefLine rline = path_to_ref_line(*path);
     FrenetConfig frenetconfig;
-    
+    CostWeights weights;
+
     while (true)
     {
         // canvas: height x width, 3-channel BGR, white background
@@ -193,7 +206,21 @@ int main()
         FrenetState fs = FrenetState(car_f.s, car.speed(), 0.0, car_f.d, 0.0, 0.0);
         auto trajs = generate_frenet_trajectories(fs, rline, frenetconfig);
 
+        double lowest_traj_cost = compute_cost(trajs[0], weights, frenetconfig);
+        const FrenetTrajectory* best_traj = &trajs[0];
+
+        for (const auto & traj : trajs)
+        {
+            double cur_traj_cost = compute_cost(traj, weights, frenetconfig);
+            if (cur_traj_cost < lowest_traj_cost)
+            {
+                lowest_traj_cost = cur_traj_cost;
+                best_traj = &traj;
+            }
+        }
+
         draw_trajectories(trajs, canvas);
+        draw_best_traj(*best_traj, canvas);
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
 
