@@ -183,15 +183,16 @@ int main()
 
     RefLine rline = path_to_ref_line(*path);
     FrenetConfig frenetconfig;
-    FrenetPoint start_f_point = to_frenet(start, rline);
-    auto start_frenetstate = FrenetState{start_f_point.s, 0.0, 0.0, start_f_point.d, 0.0, 0.0};
-    auto trajs = generate_frenet_trajectories(start_frenetstate, rline, frenetconfig);
-
+    
     while (true)
     {
         // canvas: height x width, 3-channel BGR, white background
         canvas.setTo(cv::Scalar(255, 255, 255));  // clear to white each frame
         
+        FrenetPoint car_f = to_frenet(Point{car.pose().x, car.pose().y}, rline);
+        FrenetState fs = FrenetState(car_f.s, car.speed(), 0.0, car_f.d, 0.0, 0.0);
+        auto trajs = generate_frenet_trajectories(fs, rline, frenetconfig);
+
         draw_trajectories(trajs, canvas);
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
