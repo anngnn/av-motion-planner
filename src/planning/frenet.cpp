@@ -159,3 +159,22 @@ std::vector<FrenetTrajectory> generate_frenet_trajectories(
     }
     return trajs;
 }
+
+double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config)
+{
+    double jerk_penalty = 0.0;
+    for (const auto & s_jerk : traj.s_dddot)
+    {
+        jerk_penalty += s_jerk*s_jerk;
+    }
+    for (const auto & d_jerk : traj.d_dddot)
+    {
+        jerk_penalty += d_jerk*d_jerk;
+    }
+    double offcenter_penalty = traj.d.back() * traj.d.back();
+    double speed_penalty = (traj.s_dot.back() - config.target_speed) * (traj.s_dot.back() - config.target_speed);
+
+    return weights.w_jerk * jerk_penalty
+        + weights.w_offcenter * offcenter_penalty
+        + weights.w_speed_error * speed_penalty;
+}
