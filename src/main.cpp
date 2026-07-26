@@ -101,22 +101,9 @@ void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 
 }
 
-void draw_trajectories(const std::vector<FrenetTrajectory> & trajs, cv::Mat & canvas)
-{
-    for (const auto & traj : trajs)
-    {
-        std::vector<cv::Point> pix_pts;
-        for (size_t i = 0; i < traj.x_world.size(); ++i)
-        {
-            double pix_x = world_to_pix(traj.x_world[i], true);
-            double pix_y = world_to_pix(traj.y_world[i], false);
-            pix_pts.push_back(cv::Point(pix_x, pix_y));
-        }
-        cv::polylines(canvas, pix_pts, false, cv::Scalar(200, 200, 200), 2, cv::LINE_AA);
-    }
-}
 
-void draw_best_traj(const FrenetTrajectory & traj, cv::Mat & canvas)
+// Draw one trajectory as a polyline in the given color and thickness.
+void draw_traj(const FrenetTrajectory & traj, cv::Mat & canvas, cv::Scalar color, int thickness)
 {
     std::vector<cv::Point> pix_pts;
     for (size_t i = 0; i < traj.x_world.size(); ++i)
@@ -125,8 +112,18 @@ void draw_best_traj(const FrenetTrajectory & traj, cv::Mat & canvas)
         double pix_y = world_to_pix(traj.y_world[i], false);
         pix_pts.push_back(cv::Point(pix_x, pix_y));
     }
-    cv::polylines(canvas, pix_pts, false, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+    cv::polylines(canvas, pix_pts, false, color, thickness, cv::LINE_AA);
 }
+
+// Draw all candidate trajectories faint gray so they sit behind the chosen one.
+void draw_trajectories(const std::vector<FrenetTrajectory> & trajs, cv::Mat & canvas)
+{
+    for (const auto & traj : trajs)
+    {
+        draw_traj(traj, canvas, cv::Scalar(200, 200, 200), 1);
+    }
+}
+
 
 int main()
 {
@@ -220,7 +217,7 @@ int main()
         }
 
         draw_trajectories(trajs, canvas);
-        draw_best_traj(*best_traj, canvas);
+        draw_traj(*best_traj, canvas, cv::Scalar(0, 0, 255), 3);  // best = bold red
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
 
