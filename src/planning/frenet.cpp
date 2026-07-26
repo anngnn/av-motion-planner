@@ -160,21 +160,29 @@ std::vector<FrenetTrajectory> generate_frenet_trajectories(
     return trajs;
 }
 
+// Score a candidate trajectory: lower = better. Weighted sum of three penalties:
+// rough motion (jerk), straying from lane center, and missing the target speed.
 double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config)
 {
-    double jerk_penalty = 0.0;
-    for (const auto & s_jerk : traj.s_dddot)
+    // sum of squares over a series (the jerk "energy" on one axis)
+    auto sum_of_squares = [](const std::vector<double> & v)
     {
-        jerk_penalty += s_jerk*s_jerk;
-    }
-    for (const auto & d_jerk : traj.d_dddot)
-    {
-        jerk_penalty += d_jerk*d_jerk;
-    }
-    double offcenter_penalty = traj.d.back() * traj.d.back();
-    double speed_penalty = (traj.s_dot.back() - config.target_speed) * (traj.s_dot.back() - config.target_speed);
+        double total = 0.0;
+        for (double x : v) { total += x * x; }
+        return total;
+    };
 
-    return weights.w_jerk * jerk_penalty
-        + weights.w_offcenter * offcenter_penalty
-        + weights.w_speed_error * speed_penalty;
+    // comfort: total squared jerk over both axes (big jolts punished disproportionately)
+    double jerk_penalty = sum_of_squares(traj.s_dddot) + sum_of_squares(traj.d_dddot);
+
+    // lane keeping: how far off center the trajectory ends up
+    double offcenter_penalty = traj.d.back() * traj.d.back();
+
+    // speed keeping: how far the final speed is from the target
+    double speed_error = traj.s_dot.back() - config.target_speed;
+    double speed_penalty = speed_error * speed_error;
+
+    return weights.w_jerk        * jerk_penalty
+         + weights.w_offcenter   * offcenter_penalty
+         + weights.w_speed_error * speed_penalty;
 }
