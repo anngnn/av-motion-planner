@@ -111,4 +111,16 @@ struct FrenetConfig
 std::vector<FrenetTrajectory> generate_frenet_trajectories(
     const FrenetState & start, const RefLine & rline, const FrenetConfig & config);
 
+// Weights for scoring a candidate trajectory. cost = sum of each penalty times its
+// weight; lower cost = better. Tune the RATIO between these to change the car's
+// personality (e.g. raise w_jerk to prefer smoother, gentler trajectories).
+struct CostWeights
+{
+    double w_jerk        = 1.0;  // penalize rough motion (jerk) -> comfort
+    double w_offcenter   = 1.0;  // penalize straying from the lane center (large |d|)
+    double w_speed_error = 1.0;  // penalize ending far from the target speed
+};
+
+double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config);
+
 #endif // FRENET_HPP_
