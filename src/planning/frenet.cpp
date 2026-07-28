@@ -186,3 +186,19 @@ double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, 
          + weights.w_offcenter   * offcenter_penalty
          + weights.w_speed_error * speed_penalty;
 }
+
+bool is_collision(const std::vector<Obstacle> & obstacles, const FrenetTrajectory & traj, double car_radius)
+{
+    for (size_t i = 0; i < traj.x_world.size(); ++i)
+    {
+        for (const auto & ob : obstacles)
+        {
+            double dist = eucl_dist(Point{traj.x_world[i], traj.y_world[i]}, ob.pos);
+            if (dist < ob.radius + car_radius)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
