@@ -104,6 +104,8 @@ struct FrenetConfig
     int    num_speed_samples = 3;    // how many speeds to try
 
     double dt = 0.1;  // time step when sampling points along each trajectory
+
+    double car_radius = 1.0;  // obstacles are inflated by this so the car is treated as a point
 };
 
 // Generate all candidate trajectories by sweeping lateral offset d, horizon T, and
@@ -122,5 +124,9 @@ struct CostWeights
 };
 
 double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config);
+
+// True if the trajectory passes too close to any obstacle. Each obstacle is inflated
+// by car_radius so the car can be treated as a single point along the trajectory.
+bool is_collision(const std::vector<Obstacle> & obstacles, const FrenetTrajectory & traj, double car_radius);
 
 #endif // FRENET_HPP_

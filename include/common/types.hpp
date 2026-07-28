@@ -31,6 +31,14 @@ struct TrajectoryPoint
     double t;      // seconds from now when the car should reach this point
 };
 
+// A circular obstacle the planner must avoid: a center position and a radius.
+// A candidate trajectory collides if any of its points is within radius of pos.
+struct Obstacle
+{
+    Point pos;      // center, meters, world frame
+    double radius;  // meters
+};
+
 // A* outputs a Path — ordered waypoints only, no timing or speed
 using Path = std::vector<Point>;
 
