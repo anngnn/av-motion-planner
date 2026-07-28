@@ -124,6 +124,18 @@ void draw_trajectories(const std::vector<FrenetTrajectory> & trajs, cv::Mat & ca
     }
 }
 
+// Draw each obstacle as a filled orange circle. The radius is in meters, so scale
+// it to pixels the same way positions are scaled.
+void draw_obstacles(const std::vector<Obstacle> & obs, cv::Mat & canvas)
+{
+    for (const auto & ob : obs)
+    {
+        auto pix_x = world_to_pix(ob.pos.x, true);
+        auto pix_y = world_to_pix(ob.pos.y, false);
+        int pix_radius = static_cast<int>(ob.radius * kScale);  // meters -> pixels
+        cv::circle(canvas, cv::Point(pix_x, pix_y), pix_radius, cv::Scalar(0, 140, 255), -1);
+    }
+}
 
 int main()
 {
@@ -194,6 +206,14 @@ int main()
     FrenetConfig frenetconfig;
     CostWeights weights;
 
+    // A couple of obstacles sitting on the route, so the planner has to swerve.
+    // Route runs up the left column (node 0->3), across the middle row (3->4->5),
+    // then up the right column (5->8).
+    std::vector<Obstacle> obstacles{
+        Obstacle{Point{-6.0, -3.0}, 1.5},  // on the left-column segment
+        Obstacle{Point{ 3.0,  0.0}, 1.5},  // on the middle-row segment
+    };
+
     while (true)
     {
         // canvas: height x width, 3-channel BGR, white background
@@ -208,6 +228,8 @@ int main()
 
         for (const auto & traj : trajs)
         {
+            if (is_collision(obstacles, traj, frenetconfig.car_radius)) continue;
+
             double cur_traj_cost = compute_cost(traj, weights, frenetconfig);
             if (cur_traj_cost < lowest_traj_cost)
             {
@@ -226,6 +248,7 @@ int main()
             step_toward_waypoint(*path, wp_id, car);
         }
 
+        draw_obstacles(obstacles, canvas);
         draw_car(canvas, car);
 
         cv::imshow("window title", canvas);
