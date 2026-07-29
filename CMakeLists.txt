@@ -41,7 +41,7 @@ target_compile_options(kinematic_model_lib PUBLIC -Wall -Wextra -Wpedantic)
 # whereas PRIVATE would make it apply only to the library itself
 target_compile_features(kinematic_model_lib PUBLIC cxx_std_23)
 
-add_library(planning_lib src/planning/road_graph.cpp src/planning/astar.cpp src/planning/frenet.cpp src/planning/quintic_polynomial.cpp src/planning/quartic_polynomial.cpp)
+add_library(planning_lib src/planning/road_graph.cpp src/planning/astar.cpp src/planning/frenet.cpp src/planning/quintic_polynomial.cpp src/planning/quartic_polynomial.cpp src/planning/behavior.cpp)
 target_include_directories(planning_lib PUBLIC include/ /usr/include/eigen3)
 target_compile_options(planning_lib PUBLIC -Wall -Wextra -Wpedantic)
 target_compile_features(planning_lib PUBLIC cxx_std_23)
