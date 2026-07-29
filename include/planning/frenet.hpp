@@ -105,7 +105,7 @@ struct FrenetConfig
 
     double dt = 0.1;  // time step when sampling points along each trajectory
 
-    double car_radius = 1.0;  // obstacles are inflated by this so the car is treated as a point
+    double car_radius = 1.5;  // obstacles inflated by this; extra berth covers loose pure-pursuit tracking
 };
 
 // Generate all candidate trajectories by sweeping lateral offset d, horizon T, and

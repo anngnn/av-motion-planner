@@ -12,6 +12,7 @@ constexpr int kWidth = 1000;
 constexpr int kHeight = 1000;
 constexpr double kHeadingLineLen = 20.0;
 constexpr double kReachThreshold = 1.5;
+constexpr int kLookaheadIdx = 5;  // pure-pursuit: aim this many steps ahead on the plan
 
 double world_to_pix(double coord, bool is_x)
 {
@@ -101,6 +102,22 @@ void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 
 }
 
+// Drive the car one step along the chosen Frenet trajectory (pure pursuit).
+// The trajectory is replanned every frame from the car's current pose, so
+// don't track progress along it - just aim at a fixed lookahead point a few
+// steps ahead on the fresh plan, steer toward it, and advance.
+void follow_trajectory(const FrenetTrajectory & traj, KinematicModel & car)
+{
+    // fixed lookahead point on the plan, clamped so a short trajectory can't overflow
+    int lookahead_idx = std::min(kLookaheadIdx, static_cast<int>(traj.x_world.size() - 1));
+    Point goal_wp = Point{traj.x_world[lookahead_idx], traj.y_world[lookahead_idx]};
+
+    // steer toward the lookahead point: heading error wrapped to the shortest turn
+    auto desired_heading = std::atan2(goal_wp.y - car.pose().y, goal_wp.x - car.pose().x);
+    auto steering = normalize_angle(desired_heading - car.pose().theta);
+
+    car.update(0.5, steering, 0.05);  // constant gentle acceleration, computed steering
+}
 
 // Draw one trajectory as a polyline in the given color and thickness.
 void draw_traj(const FrenetTrajectory & traj, cv::Mat & canvas, cv::Scalar color, int thickness)
@@ -188,8 +205,6 @@ int main()
         return 1;
     }
 
-    int wp_id = 0;
-
     // Spawn the car at the route's first waypoint, already facing the second one,
     // so it only needs small steering corrections instead of a hard U-turn on frame 1.
     const Point & start = path->at(0);
@@ -206,12 +221,13 @@ int main()
     FrenetConfig frenetconfig;
     CostWeights weights;
 
-    // A couple of obstacles sitting on the route, so the planner has to swerve.
+    // Obstacles sitting just BESIDE the route (offset ~1.5m from the centerline)
+    // so the planner only needs a modest swerve to clear them, not a max-width lurch.
     // Route runs up the left column (node 0->3), across the middle row (3->4->5),
     // then up the right column (5->8).
     std::vector<Obstacle> obstacles{
-        Obstacle{Point{-6.0, -3.0}, 1.5},  // on the left-column segment
-        Obstacle{Point{ 3.0,  0.0}, 1.5},  // on the middle-row segment
+        Obstacle{Point{-4.5, -3.0}, 1.0},  // just east of the left column (0->3 segment)
+        Obstacle{Point{ 3.0,  1.5}, 1.0},  // just north of the middle row (4->5 segment)
     };
 
     while (true)
@@ -243,10 +259,7 @@ int main()
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
 
-        if (wp_id < static_cast<int>(path->size()))
-        {
-            step_toward_waypoint(*path, wp_id, car);
-        }
+        follow_trajectory(*best_traj, car);
 
         draw_obstacles(obstacles, canvas);
         draw_car(canvas, car);
