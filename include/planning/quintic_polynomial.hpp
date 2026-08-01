@@ -13,7 +13,7 @@ class QuinticPolynomial
                           double T);
 
         // Evaluate the polynomial (and its derivatives) at a query time t in [0, T].
-        // T is the fixed horizon; t is any moment within it that you want the state for.
+        // T is the fixed horizon; t is any moment within it to sample the state at.
         double calc_pos(double t)  const;  // position d(t)
         double calc_vel(double t)  const;  // 1st derivative: lateral velocity
         double calc_acc(double t)  const;  // 2nd derivative: lateral acceleration

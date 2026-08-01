@@ -11,7 +11,7 @@
 // A fixed anchor point that defines the reference line itself, stored in world
 // coordinates. These are the "mile markers": each has a real (x, y), the path's
 // heading there, and its arc length s. The RefLine (vector of these) is built once
-// from the A* path and is what we use to convert between world and Frenet frames.
+// from the A* path and is used to convert between world and Frenet frames.
 struct RefPoint
 {
     Pose world_pos; // x, y in world frame; theta = path tangent (perpendicular = d axis)
@@ -21,8 +21,9 @@ struct RefPoint
 // The reference line: an ordered sequence of RefPoints with strictly increasing s.
 using RefLine = std::vector<RefPoint>;
 
-// Build a reference line from an A* path: fills in each point's heading (path
-// tangent) and cumulative arc length s. Returns empty if the path has < 2 points.
+// Builds a reference line from `path` (the ordered A* waypoints), filling in each
+// point's heading (the path tangent) and cumulative arc length s.
+// Returns the reference line, or an empty line if `path` has fewer than 2 points.
 RefLine path_to_ref_line(const Path & path);
 
 // ---------------------------------------------------------------------------
@@ -38,12 +39,14 @@ struct FrenetPoint
     double d;  // lateral offset FROM the line (signed: + one side, - the other)
 };
 
-// World (x, y) -> Frenet (s, d): projects the point onto the reference line.
-// s = arc length of the nearest point plus how far along past it, d = signed offset.
+// Converts world point `world_p` into Frenet coordinates relative to `rline`.
+// Returns a FrenetPoint where s is the arc length of the nearest reference point
+// plus how far along past it, and d is the signed lateral offset from the line.
 FrenetPoint to_frenet(const Point & world_p, const RefLine & rline);
 
-// Frenet (s, d) -> world (x, y): the inverse. Interpolates a base point at arc
-// length s along the line, then steps d perpendicular to the line's heading.
+// Converts Frenet point `fp` back into a world point relative to `rline` (the inverse
+// of to_frenet). Interpolates a base point at arc length fp.s along the line, then
+// steps fp.d perpendicular to the line's heading. Returns the resulting world point.
 Point from_frenet(const FrenetPoint & fp, const RefLine & rline);
 
 // ---------------------------------------------------------------------------
@@ -108,8 +111,10 @@ struct FrenetConfig
     double car_radius = 1.5;  // obstacles inflated by this; extra berth covers loose pure-pursuit tracking
 };
 
-// Generate all candidate trajectories by sweeping lateral offset d, horizon T, and
-// target speed. Each candidate starts from `start` and is sampled every config.dt.
+// Generates candidate trajectories from the car's current Frenet state `start`,
+// sweeping lateral offset, horizon, and target speed per the ranges in `config`.
+// Uses `rline` to convert each sample to world coordinates. Returns one trajectory
+// per (offset, horizon, speed) combination.
 std::vector<FrenetTrajectory> generate_frenet_trajectories(
     const FrenetState & start, const RefLine & rline, const FrenetConfig & config);
 
@@ -123,10 +128,14 @@ struct CostWeights
     double w_speed_error = 1.0;  // penalize ending far from the target speed
 };
 
+// Scores candidate `traj` using the multipliers in `weights` and the target speed in
+// `config`. Returns the total cost (lower is better): a weighted sum of jerk, lateral
+// offset from center, and speed error.
 double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config);
 
-// True if the trajectory passes too close to any obstacle. Each obstacle is inflated
-// by car_radius so the car can be treated as a single point along the trajectory.
+// Tests candidate `traj` against every obstacle in `obstacles`, inflating each by
+// `car_radius` so the car can be treated as a point along the trajectory.
+// Returns true if any trajectory point falls within an inflated obstacle.
 bool is_collision(const std::vector<Obstacle> & obstacles, const FrenetTrajectory & traj, double car_radius);
 
 #endif // FRENET_HPP_

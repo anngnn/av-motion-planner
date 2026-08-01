@@ -14,7 +14,9 @@ enum class State
     STOP,    // obstacle very close: come to a stop
 };
 
-// Pick the behavior state from the distance to the nearest obstacle ahead
+// Chooses the behavior state from `dist_to_obstacle`, the distance in meters to the
+// nearest obstacle ahead. Returns STOP if closer than stop_threshold, SLOW if closer
+// than far_threshold, otherwise CRUISE.
 State decide_state(double dist_to_obstacle);
 
 #endif // BEHAVIOR_HPP_

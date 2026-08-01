@@ -83,7 +83,7 @@ void draw_car(cv::Mat & canvas, KinematicModel & car)
 }
 
 // Advance the car one timestep toward the current waypoint (path[wp_id]):
-// steer toward it, then if we're within kReachThreshold, retarget the next one.
+// steer toward it, then if within kReachThreshold, retarget the next one.
 // wp_id is taken by reference so the advance persists across frames.
 void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 {
