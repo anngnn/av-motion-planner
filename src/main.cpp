@@ -161,18 +161,22 @@ void draw_obstacles(const std::vector<Obstacle> & obs, cv::Mat & canvas)
     }
 }
 
-// Returns the distance in meters from `car_pos` to the nearest obstacle in `obs`.
-// Returns a very large value when `obs` is empty, so the caller reads it as
-// "nothing close" and stays in CRUISE.
-double dist_to_nearest_obstacle(const Point & car_pos, const std::vector<Obstacle> & obs)
+// Returns the distance in meters from the car at `car_pose` to the nearest obstacle
+// in `obs` that is AHEAD of the car (in its heading direction). Obstacles beside or
+// behind are ignored. Returns a very large value when nothing is ahead, so the caller
+// reads it as "nothing close" and stays in CRUISE.
+double dist_to_nearest_obstacle(const Pose & car_pose, const std::vector<Obstacle> & obs)
 {
-    if (obs.empty())    // no obstacles -> effectively infinite clearance
-    {
-        return std::numeric_limits<double>::max();
-    }
-    double smallest_d = eucl_dist(car_pos, obs.at(0).pos);
+    Point car_pos{car_pose.x, car_pose.y};
+    double smallest_d = std::numeric_limits<double>::max();  // stays max if none ahead
     for (const auto & ob : obs)
     {
+        double to_obs_x = ob.pos.x - car_pose.x;
+        double to_obs_y = ob.pos.y - car_pose.y;
+        // project the car->obstacle vector onto the heading: > 0 means in front
+        double ahead = dot(to_obs_x, to_obs_y, std::cos(car_pose.theta), std::sin(car_pose.theta));
+        if (ahead <= 0) { continue; }  // skip obstacles beside or behind
+
         double cur_d = eucl_dist(car_pos, ob.pos);
         if (cur_d < smallest_d)
         {
@@ -267,7 +271,7 @@ int main()
         FrenetPoint car_f = to_frenet(car_pos, rline);
         FrenetState fs = FrenetState(car_f.s, car.speed(), 0.0, car_f.d, 0.0, 0.0);
         
-        double dist = dist_to_nearest_obstacle(car_pos, obstacles);
+        double dist = dist_to_nearest_obstacle(car.pose(), obstacles);
         State state = decide_state(dist);
         switch (state)
         {
@@ -284,8 +288,10 @@ int main()
 
         auto trajs = generate_frenet_trajectories(fs, rline, frenetconfig);
 
-        double lowest_traj_cost = compute_cost(trajs[0], weights, frenetconfig);
-        const FrenetTrajectory* best_traj = &trajs[0];
+        // pick the cheapest collision-free candidate; start "none found" so that if
+        // every candidate collides, best_traj stays null (road blocked -> STOP)
+        double lowest_traj_cost = std::numeric_limits<double>::max();
+        const FrenetTrajectory* best_traj = nullptr;
 
         for (const auto & traj : trajs)
         {
@@ -300,11 +306,26 @@ int main()
         }
 
         draw_trajectories(trajs, canvas);
-        draw_traj(*best_traj, canvas, cv::Scalar(0, 0, 255), 3);  // best = bold red
+
+        if (best_traj != nullptr)
+        {
+            // safe path exists: follow it at the FSM's target speed
+            draw_traj(*best_traj, canvas, cv::Scalar(0, 0, 255), 3);  // best = bold red
+        }
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
 
-        follow_trajectory(*best_traj, car, frenetconfig.target_speed);
+        if (best_traj != nullptr)
+        {
+            // safe path exists: follow it at the FSM's chosen speed (CRUISE/SLOW)
+            follow_trajectory(*best_traj, car, frenetconfig.target_speed);
+        }
+        else
+        {
+            // no collision-free trajectory: road is blocked -> brake to a stop (STOP)
+            double accel = kSpeedGain * (0.0 - car.speed());
+            car.update(accel, 0.0, 0.05);
+        }
 
         draw_obstacles(obstacles, canvas);
         draw_car(canvas, car);

@@ -31,4 +31,12 @@ inline double normalize_angle(double angle)
     return angle;
 }
 
+// Dot product of 2D vectors (ax, ay) and (bx, by): multiply matching components,
+// add them. When one vector is a unit vector, the result is the length of the
+// other's projection onto it (how much of it points that way).
+inline double dot(double ax, double ay, double bx, double by)
+{
+    return ax*bx + ay*by;
+}
+
 #endif // MATH_UTILS_HPP_
