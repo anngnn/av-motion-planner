@@ -15,6 +15,7 @@ constexpr int kHeight = 1000;
 constexpr double kHeadingLineLen = 20.0;
 constexpr double kReachThreshold = 1.5;
 constexpr int kLookaheadIdx = 5;  // pure-pursuit: aim this many steps ahead on the plan
+constexpr double kSpeedGain = 1.0;
 
 double world_to_pix(double coord, bool is_x)
 {
@@ -104,11 +105,13 @@ void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 
 }
 
-// Drive the car one step along the chosen Frenet trajectory (pure pursuit).
-// The trajectory is replanned every frame from the car's current pose, so
-// don't track progress along it - just aim at a fixed lookahead point a few
-// steps ahead on the fresh plan, steer toward it, and advance.
-void follow_trajectory(const FrenetTrajectory & traj, KinematicModel & car)
+// Drives the car one step along chosen trajectory `traj` toward `desired_speed`
+// (pure pursuit for steering, proportional control for speed). The trajectory is
+// replanned every frame from the car's current pose, so progress along it is not
+// tracked - steering aims at a fixed lookahead point on the fresh plan, and the
+// acceleration is computed to close the gap between current and desired speed
+// (so the FSM's SLOW/STOP actually change the car's velocity).
+void follow_trajectory(const FrenetTrajectory & traj, KinematicModel & car, double desired_speed)
 {
     // fixed lookahead point on the plan, clamped so a short trajectory can't overflow
     int lookahead_idx = std::min(kLookaheadIdx, static_cast<int>(traj.x_world.size() - 1));
@@ -118,7 +121,9 @@ void follow_trajectory(const FrenetTrajectory & traj, KinematicModel & car)
     auto desired_heading = std::atan2(goal_wp.y - car.pose().y, goal_wp.x - car.pose().x);
     auto steering = normalize_angle(desired_heading - car.pose().theta);
 
-    car.update(0.5, steering, 0.05);  // constant gentle acceleration, computed steering
+    // proportional speed control: accelerate toward desired_speed, brake if over
+    double accel = kSpeedGain * (desired_speed - car.speed());
+    car.update(accel, steering, 0.05);
 }
 
 // Draw one trajectory as a polyline in the given color and thickness.
@@ -299,7 +304,7 @@ int main()
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
 
-        follow_trajectory(*best_traj, car);
+        follow_trajectory(*best_traj, car, frenetconfig.target_speed);
 
         draw_obstacles(obstacles, canvas);
         draw_car(canvas, car);
