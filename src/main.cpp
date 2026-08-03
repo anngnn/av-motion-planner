@@ -1,11 +1,13 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <limits>
 
 #include "common/math_utils.hpp"
 #include "vehicle/kinematic_model.hpp"
 #include "planning/road_graph.hpp"
 #include "planning/astar.hpp"
 #include "planning/frenet.hpp"
+#include "planning/behavior.hpp"
 
 constexpr double kScale = 30.0; // pixels per meter
 constexpr int kWidth = 1000;
@@ -95,7 +97,7 @@ void step_toward_waypoint(const Path & path, int & wp_id, KinematicModel & car)
 
     car.update(0.5, steering, 0.05);  // constant gentle acceleration, computed steering
     // close enough to this waypoint -> start heading for the next one
-    if ( eucl_dist(Point{car.pose().x, car.pose().y}, goal_wp)< kReachThreshold)
+    if ( eucl_dist(Point{car.pose().x, car.pose().y}, goal_wp) < kReachThreshold)
     {
         wp_id++;
     }
@@ -152,6 +154,27 @@ void draw_obstacles(const std::vector<Obstacle> & obs, cv::Mat & canvas)
         int pix_radius = static_cast<int>(ob.radius * kScale);  // meters -> pixels
         cv::circle(canvas, cv::Point(pix_x, pix_y), pix_radius, cv::Scalar(0, 140, 255), -1);
     }
+}
+
+// Returns the distance in meters from `car_pos` to the nearest obstacle in `obs`.
+// Returns a very large value when `obs` is empty, so the caller reads it as
+// "nothing close" and stays in CRUISE.
+double dist_to_nearest_obstacle(const Point & car_pos, const std::vector<Obstacle> & obs)
+{
+    if (obs.empty())    // no obstacles -> effectively infinite clearance
+    {
+        return std::numeric_limits<double>::max();
+    }
+    double smallest_d = eucl_dist(car_pos, obs.at(0).pos);
+    for (const auto & ob : obs)
+    {
+        double cur_d = eucl_dist(car_pos, ob.pos);
+        if (cur_d < smallest_d)
+        {
+            smallest_d = cur_d;
+        }
+    }
+    return smallest_d;
 }
 
 int main()
@@ -235,8 +258,25 @@ int main()
         // canvas: height x width, 3-channel BGR, white background
         canvas.setTo(cv::Scalar(255, 255, 255));  // clear to white each frame
         
-        FrenetPoint car_f = to_frenet(Point{car.pose().x, car.pose().y}, rline);
+        Point car_pos{car.pose().x, car.pose().y};
+        FrenetPoint car_f = to_frenet(car_pos, rline);
         FrenetState fs = FrenetState(car_f.s, car.speed(), 0.0, car_f.d, 0.0, 0.0);
+        
+        double dist = dist_to_nearest_obstacle(car_pos, obstacles);
+        State state = decide_state(dist);
+        switch (state)
+        {
+            case State::CRUISE:
+                frenetconfig.target_speed = 5.0;
+                break;
+            case State::SLOW:
+                frenetconfig.target_speed = 2.5;
+                break;
+            case State::STOP:
+                frenetconfig.target_speed = 0.0;
+                break;
+        }
+
         auto trajs = generate_frenet_trajectories(fs, rline, frenetconfig);
 
         double lowest_traj_cost = compute_cost(trajs[0], weights, frenetconfig);
