@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <!-- self-contained light panel so it looks the same in GitHub light/dark -->
+  <rect x="0" y="0" width="900" height="340" rx="10" fill="#f8fafc"/>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowdash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- ===================== once, at startup ===================== -->
+  <text x="40" y="34" fill="#94a3b8" font-size="14" font-style="italic">once, at startup</text>
+
+  <!-- A* route -->
+  <rect x="40" y="48" width="230" height="62" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="155" y="76" text-anchor="middle" fill="#1e293b" font-size="16" font-weight="600">A* route</text>
+  <text x="155" y="96" text-anchor="middle" fill="#64748b" font-size="13">on the road graph</text>
+
+  <!-- reference line -->
+  <rect x="330" y="48" width="250" height="62" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="455" y="76" text-anchor="middle" fill="#1e293b" font-size="16" font-weight="600">reference line</text>
+  <text x="455" y="96" text-anchor="middle" fill="#64748b" font-size="13">arc length s, heading theta</text>
+
+  <!-- A* route -> reference line -->
+  <line x1="270" y1="79" x2="330" y2="79" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- startup -> loop (down from A* route into the frame region) -->
+  <path d="M155,110 L155,150" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- ===================== every frame ===================== -->
+  <rect x="25" y="152" width="850" height="160" rx="12" fill="#eef2f7"/>
+  <text x="855" y="176" text-anchor="end" fill="#94a3b8" font-size="14" font-style="italic">every frame</text>
+
+  <!-- four stage boxes -->
+  <!-- 84 Frenet candidates -->
+  <rect x="45" y="200" width="185" height="62" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="137" y="228" text-anchor="middle" fill="#1e293b" font-size="16" font-weight="600">84 Frenet</text>
+  <text x="137" y="248" text-anchor="middle" fill="#64748b" font-size="13">candidates</text>
+
+  <!-- cost + collision -->
+  <rect x="255" y="200" width="185" height="62" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="347" y="228" text-anchor="middle" fill="#1e293b" font-size="16" font-weight="600">cost +</text>
+  <text x="347" y="248" text-anchor="middle" fill="#64748b" font-size="13">collision check</text>
+
+  <!-- behavior FSM -->
+  <rect x="465" y="200" width="185" height="62" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="557" y="228" text-anchor="middle" fill="#1e293b" font-size="16" font-weight="600">behavior FSM</text>
+  <text x="557" y="248" text-anchor="middle" fill="#64748b" font-size="13">CRUISE / STOP</text>
+
+  <!-- pure pursuit -->
+  <rect x="675" y="200" width="185" height="62" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="767" y="228" text-anchor="middle" fill="#1e293b" font-size="16" font-weight="600">pure pursuit</text>
+  <text x="767" y="248" text-anchor="middle" fill="#64748b" font-size="13">+ speed control</text>
+
+  <!-- stage arrows -->
+  <line x1="230" y1="231" x2="255" y2="231" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="440" y1="231" x2="465" y2="231" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="650" y1="231" x2="675" y2="231" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- replan loop: pure pursuit -> down -> back to candidates -->
+  <path d="M767,262 L767,292 L137,292 L137,262"
+        fill="none" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrowdash)"/>
+  <text x="452" y="308" text-anchor="middle" fill="#64748b" font-size="13" font-style="italic">replan from the car's new pose</text>
+</svg>

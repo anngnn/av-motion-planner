@@ -37,35 +37,11 @@ paced by `cv::waitKey(30)`, a ~30 ms delay, so roughly 30 frames per second).
 
 ## Architecture
 
-```
-GLOBAL  (once):
-    road graph  --A* search-->  global route  --build-->  reference line
-                                                           (fixed input below)
+![architecture](docs/architecture.svg)
 
-LOCAL  (every rendered frame, ~30 ms per loop via cv::waitKey):
-
-    car pose
-        |  to_frenet: project onto the reference line -> car's Frenet state
-        v
-    Frenet start state
-        |  sample candidates: lateral offset  x  horizon  x  target speed
-        v
-    candidate trajectories            (quintic lateral + quartic longitudinal)
-        |  score:  jerk + lane-center + speed error + obstacle proximity
-        |  reject: colliding candidates
-        v
-    best collision-free trajectory
-        |  behavioral FSM:  CRUISE (a path exists)  /  STOP (blocked or goal)
-        v
-    pure pursuit  +  proportional speed control
-        |  car.update(...) advances the car one step
-        v
-    kinematic bicycle model  -->  new car pose
-                                       |
-                                       +--> next tick: this new pose becomes the
-                                            "car pose" at the top, and the whole
-                                            local loop runs again (replan)
-```
+The route and reference line are built once at startup; the local planning loop runs
+every frame (paced by `cv::waitKey(30)`, ~30 ms), re-planning from the car's new pose
+each tick. The step-by-step breakdown is in [What it does](#what-it-does) above.
 
 | Layer | Responsibility | Code |
 |---|---|---|
