@@ -162,31 +162,6 @@ void draw_obstacles(const std::vector<Obstacle> & obs, cv::Mat & canvas)
     }
 }
 
-// Returns the distance in meters from the car at `car_pose` to the nearest obstacle
-// in `obs` that is AHEAD of the car (in its heading direction). Obstacles beside or
-// behind are ignored. Returns a very large value when nothing is ahead, so the caller
-// reads it as "nothing close" and stays in CRUISE.
-double dist_to_nearest_obstacle(const Pose & car_pose, const std::vector<Obstacle> & obs)
-{
-    Point car_pos{car_pose.x, car_pose.y};
-    double smallest_d = std::numeric_limits<double>::max();  // stays max if none ahead
-    for (const auto & ob : obs)
-    {
-        double to_obs_x = ob.pos.x - car_pose.x;
-        double to_obs_y = ob.pos.y - car_pose.y;
-        // project the car->obstacle vector onto the heading: > 0 means in front
-        double ahead = dot(to_obs_x, to_obs_y, std::cos(car_pose.theta), std::sin(car_pose.theta));
-        if (ahead <= 0) { continue; }  // skip obstacles beside or behind
-
-        double cur_d = eucl_dist(car_pos, ob.pos);
-        if (cur_d < smallest_d)
-        {
-            smallest_d = cur_d;
-        }
-    }
-    return smallest_d;
-}
-
 int main()
 {
     cv::Mat canvas(kHeight, kWidth, CV_8UC3);
