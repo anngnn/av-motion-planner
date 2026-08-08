@@ -108,7 +108,7 @@ struct FrenetConfig
 
     double dt = 0.1;  // time step when sampling points along each trajectory
 
-    double car_radius = 1.5;  // obstacles inflated by this; extra berth covers loose pure-pursuit tracking
+    double car_radius = 1.0;  // obstacles inflated by this; extra berth covers loose pure-pursuit tracking
 };
 
 // Generates candidate trajectories from the car's current Frenet state `start`,
@@ -126,12 +126,15 @@ struct CostWeights
     double w_jerk        = 1.0;  // penalize rough motion (jerk) -> comfort
     double w_offcenter   = 1.0;  // penalize straying from the lane center (large |d|)
     double w_speed_error = 1.0;  // penalize ending far from the target speed
+    double w_obstacle    = 5.0;  // penalize passing close to obstacles -> early avoidance
 };
 
-// Scores candidate `traj` using the multipliers in `weights` and the target speed in
-// `config`. Returns the total cost (lower is better): a weighted sum of jerk, lateral
-// offset from center, and speed error.
-double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config);
+// Scores candidate `traj` using the multipliers in `weights`, the target speed in
+// `config`, and the `obstacles` to stay clear of. Returns the total cost (lower is
+// better): a weighted sum of jerk, lateral offset from center, speed error, and
+// obstacle proximity (inverse distance to each obstacle's edge).
+double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights,
+                    const FrenetConfig & config, const std::vector<Obstacle> & obstacles);
 
 // Tests candidate `traj` against every obstacle in `obstacles`, inflating each by
 // `car_radius` so the car can be treated as a point along the trajectory.

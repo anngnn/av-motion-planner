@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "common/math_utils.hpp"
 #include "planning/frenet.hpp"
 #include "planning/quintic_polynomial.hpp"
@@ -67,7 +69,11 @@ FrenetPoint to_frenet(const Point & world_p, const RefLine & rline)
 // (3) step d meters perpendicular to that heading.
 Point from_frenet(const FrenetPoint & fp, const RefLine & rline)
 {
-    auto s = fp.s;
+    // Clamp s to the line's range. Trajectories extend past the end of the reference
+    // line; without this, a beyond-the-end s finds no bracketing pair, leaving
+    // lower == upper and dividing by zero below -> NaN world points (car flies off).
+    // Clamping maps any point past the goal onto the final reference point instead.
+    auto s = std::clamp(fp.s, rline.front().s, rline.back().s);
     auto d = fp.d;
 
     // Step 1: find the bracketing pair where lower.s <= s <= upper.s
@@ -160,9 +166,10 @@ std::vector<FrenetTrajectory> generate_frenet_trajectories(
     return trajs;
 }
 
-// Score a candidate trajectory: lower = better. Weighted sum of three penalties:
-// rough motion (jerk), straying from lane center, and missing the target speed.
-double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config)
+// Score a candidate trajectory: lower = better. Weighted sum of four penalties:
+// rough motion (jerk), straying from lane center, missing the target speed, and
+// passing close to obstacles (which biases the car to avoid them early).
+double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, const FrenetConfig & config, const std::vector<Obstacle> & obstacles)
 {
     // sum of squares over a series (the jerk "energy" on one axis)
     auto sum_of_squares = [](const std::vector<double> & v)
@@ -182,19 +189,42 @@ double compute_cost(const FrenetTrajectory & traj, const CostWeights & weights, 
     double speed_error = traj.s_dot.back() - config.target_speed;
     double speed_penalty = speed_error * speed_error;
 
+    // obstacle proximity: penalize passing CLOSE to obstacles (not just colliding),
+    // so the planner drifts wide EARLY rather than reacting only once a path collides.
+    // Inverse distance-to-edge: near points cost a lot, far points almost nothing.
+    constexpr double kMinClearance = 0.1;  // floor so 1/d stays finite at or inside the edge
+    double obstacle_penalty = 0.0;
+    for (size_t i = 0; i < traj.x_world.size(); ++i)
+    {
+        Point p{traj.x_world[i], traj.y_world[i]};
+        for (const auto & ob : obstacles)
+        {
+            double d_edge = eucl_dist(p, ob.pos) - ob.radius;  // distance to the obstacle's edge
+            double d_safe = std::max(d_edge, kMinClearance);   // clamp so it never blows up
+            obstacle_penalty += 1.0 / d_safe;
+        }
+    }
+
     return weights.w_jerk        * jerk_penalty
          + weights.w_offcenter   * offcenter_penalty
-         + weights.w_speed_error * speed_penalty;
+         + weights.w_speed_error * speed_penalty
+         + weights.w_obstacle    * obstacle_penalty;
 }
 
 bool is_collision(const std::vector<Obstacle> & obstacles, const FrenetTrajectory & traj, double car_radius)
 {
-    for (size_t i = 0; i < traj.x_world.size(); ++i)
+    // Skip the first few points: they are essentially the car's current position,
+    // which it cannot un-occupy. If the car has drifted inside an inflated obstacle,
+    // judging those points as a collision would reject EVERY trajectory (they all
+    // start there) and freeze the car. Only where the trajectory is GOING should
+    // count, so a path that exits the zone stays valid and lets the car escape.
+    constexpr size_t kSkipStartPoints = 3;
+    for (size_t i = kSkipStartPoints; i < traj.x_world.size(); ++i)
     {
         for (const auto & ob : obstacles)
         {
             double dist = eucl_dist(Point{traj.x_world[i], traj.y_world[i]}, ob.pos);
-            if (dist < ob.radius + car_radius)
+            if (dist < ob.radius + car_radius)  // inside the inflated obstacle
             {
                 return true;
             }

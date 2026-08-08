@@ -14,8 +14,9 @@ constexpr int kWidth = 1000;
 constexpr int kHeight = 1000;
 constexpr double kHeadingLineLen = 20.0;
 constexpr double kReachThreshold = 1.5;
-constexpr int kLookaheadIdx = 5;  // pure-pursuit: aim this many steps ahead on the plan
+constexpr int kLookaheadIdx = 12;  // pure-pursuit: aim this many steps ahead on the plan
 constexpr double kSpeedGain = 1.0;
+constexpr double kGoalTolerance = 3.0; // meters
 
 double world_to_pix(double coord, bool is_x)
 {
@@ -253,13 +254,13 @@ int main()
     FrenetConfig frenetconfig;
     CostWeights weights;
 
-    // Obstacles sitting just BESIDE the route (offset ~1.5m from the centerline)
-    // so the planner only needs a modest swerve to clear them, not a max-width lurch.
-    // Route runs up the left column (node 0->3), across the middle row (3->4->5),
-    // then up the right column (5->8).
+    // Obstacles placed on later route segments (NOT the start) so the car has runway
+    // to develop a swerve before reaching them. Small radius + ~1.5m offset means the
+    // required swerve is gentle and always feasible. Route runs up the left column
+    // (node 0->3), across the middle row (3->4->5), then up the right column (5->8).
     std::vector<Obstacle> obstacles{
-        Obstacle{Point{-4.5, -3.0}, 1.0},  // just east of the left column (0->3 segment)
-        Obstacle{Point{ 3.0,  1.5}, 1.0},  // just north of the middle row (4->5 segment)
+        Obstacle{Point{0.0, 1.5}, 0.8},  // north of the middle row, mid-segment (long runway)
+        Obstacle{Point{4.5, 3.0}, 0.8},  // west of the right column (5->8 segment)
     };
 
     while (true)
@@ -269,22 +270,8 @@ int main()
         
         Point car_pos{car.pose().x, car.pose().y};
         FrenetPoint car_f = to_frenet(car_pos, rline);
+        bool reached_goal = car_f.s >= rline.back().s - kGoalTolerance;
         FrenetState fs = FrenetState(car_f.s, car.speed(), 0.0, car_f.d, 0.0, 0.0);
-        
-        double dist = dist_to_nearest_obstacle(car.pose(), obstacles);
-        State state = decide_state(dist);
-        switch (state)
-        {
-            case State::CRUISE:
-                frenetconfig.target_speed = 5.0;
-                break;
-            case State::SLOW:
-                frenetconfig.target_speed = 2.5;
-                break;
-            case State::STOP:
-                frenetconfig.target_speed = 0.0;
-                break;
-        }
 
         auto trajs = generate_frenet_trajectories(fs, rline, frenetconfig);
 
@@ -297,7 +284,7 @@ int main()
         {
             if (is_collision(obstacles, traj, frenetconfig.car_radius)) continue;
 
-            double cur_traj_cost = compute_cost(traj, weights, frenetconfig);
+            double cur_traj_cost = compute_cost(traj, weights, frenetconfig, obstacles);
             if (cur_traj_cost < lowest_traj_cost)
             {
                 lowest_traj_cost = cur_traj_cost;
@@ -305,30 +292,44 @@ int main()
             }
         }
 
+        // Behavioral FSM, decided by FEASIBILITY (not distance): CRUISE when a
+        // collision-free trajectory exists AND the goal isn't reached; otherwise STOP
+        // (arrived at the goal, or the road is blocked). Distance-based SLOW was removed:
+        // slowing near an avoidable obstacle strips the momentum the swerve needs, which
+        // caused a deadlock (see frenet deep-dive notes).
+        State state = (best_traj != nullptr && !reached_goal) ? State::CRUISE : State::STOP;
+
+        // draw
         draw_trajectories(trajs, canvas);
 
-        if (best_traj != nullptr)
+        if (best_traj != nullptr) 
         {
-            // safe path exists: follow it at the FSM's target speed
             draw_traj(*best_traj, canvas, cv::Scalar(0, 0, 255), 3);  // best = bold red
         }
+
         draw_road_nodes(rg, canvas);
         draw_astar_path(*path, canvas);
-
-        if (best_traj != nullptr)
-        {
-            // safe path exists: follow it at the FSM's chosen speed (CRUISE/SLOW)
-            follow_trajectory(*best_traj, car, frenetconfig.target_speed);
-        }
-        else
-        {
-            // no collision-free trajectory: road is blocked -> brake to a stop (STOP)
-            double accel = kSpeedGain * (0.0 - car.speed());
-            car.update(accel, 0.0, 0.05);
-        }
-
         draw_obstacles(obstacles, canvas);
         draw_car(canvas, car);
+
+        // control: CRUISE -> follow the plan; STOP -> brake and hold
+        auto brake = [&car]()
+        {
+            double accel = kSpeedGain * (0.0 - car.speed());
+            car.update(accel, 0.0, 0.05);
+        };
+
+        if (state == State::CRUISE)
+        {
+            // safe path exists and goal not reached: follow at full cruise speed
+            follow_trajectory(*best_traj, car, frenetconfig.target_speed);
+        }
+        else  // State::STOP -- arrived at the goal, or road blocked
+        {
+            brake();
+        }
+
+        
 
         cv::imshow("window title", canvas);
 
