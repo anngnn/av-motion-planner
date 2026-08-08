@@ -30,21 +30,41 @@ Each frame, the planner:
 6. **Control** - pure-pursuit steering + proportional speed control execute the chosen
    trajectory on a kinematic bicycle model.
 
-...then it re-plans from the car's new state, ~30× per second.
+...then it re-plans from the car's new state once per rendered frame (the loop is
+paced by `cv::waitKey(30)`, a ~30 ms delay, so roughly 30 frames per second).
 
 ---
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    A[Road graph] -->|A* search| B[Global route]
-    B -->|build reference line| C[Frenet frame]
-    C -->|sample d x T x speed| D[Candidate trajectories]
-    D -->|cost + collision| E[Best trajectory]
-    E -->|feasibility FSM| F[CRUISE / STOP]
-    F -->|pure pursuit + speed control| G[Kinematic bicycle model]
-    G -->|new pose| C
+```
+GLOBAL  (once):
+    road graph  --A* search-->  global route  --build-->  reference line
+                                                           (fixed input below)
+
+LOCAL  (every rendered frame, ~30 ms per loop via cv::waitKey):
+
+    car pose
+        |  to_frenet: project onto the reference line -> car's Frenet state
+        v
+    Frenet start state
+        |  sample candidates: lateral offset  x  horizon  x  target speed
+        v
+    candidate trajectories            (quintic lateral + quartic longitudinal)
+        |  score:  jerk + lane-center + speed error + obstacle proximity
+        |  reject: colliding candidates
+        v
+    best collision-free trajectory
+        |  behavioral FSM:  CRUISE (a path exists)  /  STOP (blocked or goal)
+        v
+    pure pursuit  +  proportional speed control
+        |  car.update(...) advances the car one step
+        v
+    kinematic bicycle model  -->  new car pose
+                                       |
+                                       +--> next tick: this new pose becomes the
+                                            "car pose" at the top, and the whole
+                                            local loop runs again (replan)
 ```
 
 | Layer | Responsibility | Code |
