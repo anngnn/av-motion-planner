@@ -63,7 +63,7 @@ include(CTest)
 
 if(BUILD_TESTING)
   find_package(Catch2 3 REQUIRED)
-  add_executable(test_planning_exe tests/test_road_graph.cpp tests/test_astar.cpp tests/test_frenet.cpp tests/test_quintic.cpp tests/test_quartic.cpp)
+  add_executable(test_planning_exe tests/test_road_graph.cpp tests/test_astar.cpp tests/test_frenet.cpp tests/test_quintic.cpp tests/test_quartic.cpp tests/test_cost.cpp)
   target_link_libraries(test_planning_exe Catch2::Catch2WithMain planning_lib)
   add_test(NAME test_planning COMMAND test_planning_exe)
 endif()
